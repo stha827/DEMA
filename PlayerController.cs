@@ -1,4 +1,5 @@
 using UnityEngine;
+using System.Collections.Generic;
 
 public class PlayerController : MonoBehaviour
 {
@@ -27,6 +28,9 @@ public class PlayerController : MonoBehaviour
     public float rangoDisparo = 20f; 
     [Header("Ajustes de Aparición")]
     public Transform puntoDeAparicion; 
+
+    // Lista  para guardar qué enemigos  ya han sido derrotados y evitar bucles
+    private List<EnemyAction> enemigosMuertos = new List<EnemyAction>();
 
     void Start()
     {
@@ -121,6 +125,9 @@ public class PlayerController : MonoBehaviour
         haGanado = false;
         velocidadCaida = Vector3.zero;
         xRotation = 0f;
+
+        // Limpiamos la lista de bajas al reiniciar la ronda
+        enemigosMuertos.Clear();
     }
 
     // Lógica para manejar la muerte del jugador
@@ -137,17 +144,34 @@ public class PlayerController : MonoBehaviour
         }
     }
 
-    // Lógica para manejar la victoria del jugador
-    public void Ganar()
+    // Método para registrar la baja de un enemigo, evitando el bucle del Update
+    public void RegistrarBajaEnemigo(EnemyAction enemigo)
     {
-        if (!haGanado)
+        if (!haGanado && enemigo != null)
         {
-            haGanado = true;
-            Debug.Log("¡Victoria!");
+            // Si este enemigo ya lo teníamos registrado como muerto, ignoramos el aviso repetido del Update
+            if (enemigosMuertos.Contains(enemigo)) return;
 
-            if (authManager != null) {
-                authManager.GanarPartida();
+            // Guardamos el enemigo en la lista de bajas reales
+            enemigosMuertos.Add(enemigo);
+            Debug.Log("Enemigos derrotados actualmente: " + enemigosMuertos.Count);
+
+            // Comprobamos si las bajas totales igualan a los enemigos de la escena
+            if (authManager != null && authManager.enemies != null && enemigosMuertos.Count >= authManager.enemies.Length)
+            {
+                haGanado = true;
+
+                if (authManager != null) {
+                    authManager.GanarPartida();
+                }
+            }
+            else
+            {
+                Debug.Log("Enemigo derrotado. Quedan más enemigos");
             }
         }
     }
+
+    // Mantengo este método vacío por compatibilidad si algún otro script lo busca
+    public void Ganar() {}
 }

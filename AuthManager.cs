@@ -5,15 +5,14 @@ using Firebase.Firestore;
 using TMPro;
 using System.Collections;
 using UnityEngine.Video; 
-using System.Collections.Generic;
-
+using System.Collections.Generic; 
 public class AuthManager : MonoBehaviour
 {
     [Header("Objetos del Mundo")]
     public GameObject menuCamera;
     public GameObject mainPlayer;
-    public GameObject enemy;
-    public GameObject gameUI;
+    public GameObject[] enemies; 
+    public GameObject gameUI; 
 
     [Header("Referencias de Scripts")]
     public PlayerController playerScript; 
@@ -50,9 +49,9 @@ public class AuthManager : MonoBehaviour
     public TMP_InputField confirmPassRegisterField; 
     public TMP_Text warningRegisterText;
 
-    // Variables de respawn para el enemigo
-    private Vector3 enemyStartPos;
-    private Quaternion enemyStartRot;
+    // Listas para almacenar las posiciones iniciales de cada enemigo
+    private List<Vector3> enemiesStartPos = new List<Vector3>();
+    private List<Quaternion> enemiesStartRot = new List<Quaternion>();
 
     private FirebaseAuth auth;
     private Coroutine corrutinaIntro;
@@ -69,15 +68,20 @@ public class AuthManager : MonoBehaviour
         gameUI.SetActive(false);
         victoryPanel.SetActive(false);
         gameOverPanel.SetActive(false);
-        if(enemy != null) enemy.SetActive(false);
+        
+        // Guardamos las posiciones y ocultamos todos los enemigos de la lista
+        if (enemies != null) {
+            foreach (GameObject currentEnemy in enemies) {
+                if (currentEnemy != null) {
+                    enemiesStartPos.Add(currentEnemy.transform.position);
+                    enemiesStartRot.Add(currentEnemy.transform.rotation);
+                    currentEnemy.SetActive(false);
+                }
+            }
+        }
         
         if(menuCamera != null) menuCamera.SetActive(true);
         if(loginUIParent != null) loginUIParent.SetActive(true);
-
-        if (enemy != null) {
-            enemyStartPos = enemy.transform.position;
-            enemyStartRot = enemy.transform.rotation;
-        }
 
         FirebaseApp.CheckAndFixDependenciesAsync().ContinueWith(task => {
             var dependencyStatus = task.Result;
@@ -218,7 +222,14 @@ public class AuthManager : MonoBehaviour
 
         if(menuCamera != null) menuCamera.SetActive(false);
         mainPlayer.SetActive(true);
-        if (enemy != null) enemy.SetActive(true); 
+        
+        // Activamos todos los enemigos guardados en la lista
+        if (enemies != null) {
+            foreach (GameObject currentEnemy in enemies) {
+                if (currentEnemy != null) currentEnemy.SetActive(true);
+            }
+        }
+
         gameUI.SetActive(true);
         if (timerScript != null) timerScript.ActivarTimer();
 
@@ -258,7 +269,14 @@ public class AuthManager : MonoBehaviour
     private IEnumerator ResetearRondaRapida()
     {
         mainPlayer.SetActive(false);
-        if (enemy != null) enemy.SetActive(false);
+        
+        // Apagamos todos los enemigos antes de reubicarlos
+        if (enemies != null) {
+            foreach (GameObject currentEnemy in enemies) {
+                if (currentEnemy != null) currentEnemy.SetActive(false);
+            }
+        }
+
         if (musicaJuego != null) musicaJuego.Stop();
 
         yield return new WaitForSeconds(0.2f);
@@ -272,14 +290,21 @@ public class AuthManager : MonoBehaviour
     {
         if (playerScript != null) playerScript.ResetState(); 
         
-        if (enemy != null) {
-            enemy.SetActive(true); 
-            enemy.transform.position = enemyStartPos; 
-            enemy.transform.rotation = enemyStartRot;
+        // Reseteamos las posiciones y los estados de cada enemigo del array
+        if (enemies != null) {
+            for (int i = 0; i < enemies.Length; i++) {
+                if (enemies[i] != null && i < enemiesStartPos.Count) {
+                    enemies[i].SetActive(true); 
+                    enemies[i].transform.position = enemiesStartPos[i]; 
+                    enemies[i].transform.rotation = enemiesStartRot[i];
 
-            if (enemyScript != null) enemyScript.ResetEnemy();
+                    // Si cada clon tiene su propio script de control, lo reseteamos localmente
+                    EnemyAction currentEnemyScript = enemies[i].GetComponent<EnemyAction>();
+                    if (currentEnemyScript != null) currentEnemyScript.ResetEnemy();
 
-            enemy.SetActive(false); 
+                    enemies[i].SetActive(false); 
+                }
+            }
         }
     }
 
@@ -302,10 +327,14 @@ public class AuthManager : MonoBehaviour
     }
 
     // --- FINALES DE PARTIDA ---
-
     // Función que se llama desde el script del enemigo cuando detecta que el jugador ha derrotado al enemigo
     public void GanarPartida() { 
-        // --- GUARDADO DE VICTORIA EN CLOUD FIRESTORE ---
+        if (playerScript != null && !playerScript.haGanado) 
+        {
+            return; 
+        }
+
+        // --- GUARDADO DE VICTORIA EN FIRESTORE ---
         if (auth != null && auth.CurrentUser != null)
         {
             string userId = auth.CurrentUser.UserId;
@@ -320,7 +349,7 @@ public class AuthManager : MonoBehaviour
     
     // Función que se llama desde el script del enemigo cuando detecta que el jugador ha sido derrotado
     public void PerderPartida() { 
-        // --- GUARDADO DE DERROTA EN CLOUD FIRESTORE ---
+        // --- GUARDADO DE DERROTA EN FIRESTORE ---
         if (auth != null && auth.CurrentUser != null)
         {
             string userId = auth.CurrentUser.UserId;
@@ -333,11 +362,17 @@ public class AuthManager : MonoBehaviour
         StartCoroutine(FinalDePartida(gameOverPanel, videoDerrota)); 
     }
 
-    // Función que se encarga de mostrar el panel de victoria o derrota, reproducir el video correspondiente, detener la música y más elementos necesarios para el final de partida
+    // Función que se encarga de mostrar el panel de victoria o derrota, reproducir el video correspondiente, detener la música y más elementos necesarios
     private IEnumerator FinalDePartida(GameObject panelFinal, VideoPlayer videoFinal) {
         mainPlayer.SetActive(false);
         gameUI.SetActive(false);
-        if (enemy != null) enemy.SetActive(false);
+        
+        // Apagamos todos los enemigos al finalizar por completo el juego
+        if (enemies != null) {
+            foreach (GameObject currentEnemy in enemies) {
+                if (currentEnemy != null) currentEnemy.SetActive(false);
+            }
+        }
         
         if (musicaJuego != null) musicaJuego.Stop();
 

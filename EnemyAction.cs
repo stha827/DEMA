@@ -43,8 +43,11 @@ public class EnemyAction : MonoBehaviour
         // Verificar la victoria
         if (AlasPerdidas >= 2)
         {
-            if (scriptJugador != null) scriptJugador.Ganar(); 
+            if (scriptJugador != null) scriptJugador.RegistrarBajaEnemigo(this); 
             if (agent.isOnNavMesh) agent.isStopped = true; 
+
+            gameObject.SetActive(false);
+
             return;
         }
 
@@ -100,6 +103,8 @@ public class EnemyAction : MonoBehaviour
     // Resetea el estado del enemigo para reiniciar la partida
     public void ResetEnemy()
     {
+        gameObject.SetActive(true);
+
         // Reseteamos todos los valores
         AlasPerdidas = 0;
         nextFireTime = Time.time;
